@@ -41,7 +41,7 @@ class CrossEntropyLabelSmooth(nn.Layer):
         return loss
 
 
-def hard_example_mining(dist_mat, labels, return_inds=False):
+def hard_example_mining(dist_mat, target, return_inds=False):
     """For each anchor, find the hardest positive and negative sample.
     Args:
       dist_mat: pytorch Variable, pair wise distance between samples, shape [N, N]
@@ -60,48 +60,62 @@ def hard_example_mining(dist_mat, labels, return_inds=False):
 
     assert len(dist_mat.shape) == 2
     assert dist_mat.shape[0] == dist_mat.shape[1]
-    N = dist_mat.shape[0]
+    bs = dist_mat.shape[0]
 
-    # shape [N, N]
-    is_pos = paddle.expand(labels, [N, N])
-    is_pos = paddle.equal(is_pos, paddle.transpose(paddle.expand(labels, [N, N]), [1,0]))
-    #is_pos = labels.expand(N, N).eq(paddle.transpose(labels.expand(N, N), [1,0]))
-    #is_neg = labels.expand(N, N).ne(paddle.transpose(labels.expand(N, N), [1,0]))
-    is_neg = ~is_pos
+    is_pos = paddle.expand(target, (
+        bs, bs)).equal(paddle.expand(target, (bs, bs)).t())
+    is_neg = paddle.expand(target, (
+        bs, bs)).not_equal(paddle.expand(target, (bs, bs)).t())
 
     # `dist_ap` means distance(anchor, positive)
-    # both `dist_ap` and `relative_p_inds` with shape [N, 1]
-    # dist_ap, relative_p_inds = paddle.max(
-    #     paddle.reshape(dist_mat[is_pos], [N, -1]), 1, keepdim=True)
-    relative_p_inds = paddle.argmax(paddle.reshape(dist_mat[is_pos], [N, -1]), 1, keepdim=True)
-    dist_ap = paddle.max(paddle.reshape(dist_mat[is_pos], [N, -1]), 1, keepdim=True)
+    ## both `dist_ap` and `relative_p_inds` with shape [N, 1]
+    '''
+    dist_ap, relative_p_inds = paddle.max(
+        paddle.reshape(dist[is_pos], (bs, -1)), axis=1, keepdim=True)
     # `dist_an` means distance(anchor, negative)
     # both `dist_an` and `relative_n_inds` with shape [N, 1]
-    # dist_an, relative_n_inds = paddle.min(
-    #     paddle.reshape(dist_mat[is_neg], [N, -1]), 1, keepdim=True)
-    relative_n_inds = paddle.argmin(paddle.reshape(dist_mat[is_neg], [N, -1]), 1, keepdim=True)
-    dist_an = paddle.min(paddle.reshape(dist_mat[is_neg], [N, -1]), 1, keepdim=True)
+    dist_an, relative_n_inds = paddle.min(
+        paddle.reshape(dist[is_neg], (bs, -1)), axis=1, keepdim=True)
+    '''
+    dist_ap = paddle.max(paddle.reshape(
+        paddle.masked_select(dist_mat, is_pos), (bs, -1)),
+                            axis=1,
+                            keepdim=True)
+    relative_p_inds = paddle.argmax(paddle.reshape(
+        paddle.masked_select(dist_mat, is_pos), (bs, -1)),
+                            axis=1,
+                            keepdim=True)
+    # `dist_an` means distance(anchor, negative)
+    # both `dist_an` and `relative_n_inds` with shape [N, 1]
+    dist_an = paddle.min(paddle.reshape(
+        paddle.masked_select(dist_mat, is_neg), (bs, -1)),
+                            axis=1,
+                            keepdim=True)
+    relative_n_inds = paddle.argmin(paddle.reshape(
+        paddle.masked_select(dist_mat, is_neg), (bs, -1)),
+                            axis=1,
+                            keepdim=True)
     # shape [N]
-    dist_ap = dist_ap.squeeze(1)
-    dist_an = dist_an.squeeze(1)
+    dist_ap = paddle.squeeze(dist_ap, axis=1)
+    dist_an = paddle.squeeze(dist_an, axis=1)
 
     if return_inds:
         # shape [N, N]
-        ind = paddle.zeros_like(labels)
-        ind = ind[:] = paddle.arange(0, N)
-        ind = ind.unsqueeze(0).expand([N,N])
+        ind = paddle.zeros_like(target)
+        ind[:] = paddle.arange(0, bs)
+        ind = ind.unsqueeze(0).expand([bs,bs])
         # ind = (labels.new().resize_as_(labels)
         #        .copy_(paddle.arange(0, N).long())
         #        .unsqueeze(0).expand(N, N))
         # shape [N]
         # Implement gather() using one_hot()
-        ind_pos = paddle.reshape(ind[is_pos], [N, -1])
+        ind_pos = paddle.reshape(ind[is_pos], [bs, -1])
         d = paddle.nn.functional.one_hot(relative_p_inds.squeeze(-1), ind_pos.shape[1])
         p_inds = paddle.sum(ind_pos*d, axis=1)
 
         # n_inds = paddle.gather(
         #     paddle.reshape(ind[is_neg], [N, -1]), relative_n_inds, 1)
-        ind_neg = paddle.reshape(ind[is_neg], [N, -1])
+        ind_neg = paddle.reshape(ind[is_neg], [bs, -1])
         d = paddle.nn.functional.one_hot(relative_n_inds.squeeze(-1), ind_neg.shape[1])
         n_inds = paddle.sum(ind_neg*d, axis=1)
         return dist_ap, dist_an, p_inds, n_inds

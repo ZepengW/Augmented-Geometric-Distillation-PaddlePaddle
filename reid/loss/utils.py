@@ -25,7 +25,7 @@ def euclidean_dist(x, y, *args):
     yy = paddle.transpose(paddle.expand(paddle.pow(y, 2).sum(1, keepdim=True), shape=[n, m]), [1,0])
     dist = xx + yy
     #dist.addmm_(1, -2, x, paddle.transpose(y, [1,0]))
-    dist = paddle.addmm(dist, x, paddle.transpose(y, [1,0]), 1, -2)
+    dist = paddle.addmm(input = dist, x = x, y = y.t(), alpha=-2.0, beta=1.0)
     
     # dist = dist.clamp(min=1e-12).sqrt()  # for numerical stability
     dist = paddle.sqrt(paddle.clip(dist, min=1e-12))
