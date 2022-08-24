@@ -44,7 +44,7 @@ class SupervisedTrainer(Trainer):
         self.lr_scheduler.step(epoch)
 
     def train_step(self, inputs, pids):
-        self.optimizer.zero_grad()
+        self.optimizer.clear_grad()
         outputs = self.networks(inputs)
         loss, losses = self._compute_loss(outputs, pids)
         loss.backward()

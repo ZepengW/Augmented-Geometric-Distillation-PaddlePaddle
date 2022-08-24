@@ -58,10 +58,7 @@ class CheckpointManager(object):
         ckpt = {}
         modules.update(self.modules)
         for name, module in modules.items():
-            if isinstance(module, nn.DataParallel):
-                ckpt[name] = module.module.state_dict()
-            else:
-                ckpt[name] = module.state_dict()
+            ckpt[name] = module.state_dict()
         ckpt['epoch'] = epoch + 1
 
         fpath = osp.join(self.logs_dir, f"checkpoint-epoch{epoch}.pth.tar") if fpath is None else fpath

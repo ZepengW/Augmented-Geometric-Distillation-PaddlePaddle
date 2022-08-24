@@ -25,7 +25,7 @@ class CrossEntropyLabelSmooth(nn.Layer):
     def __init__(self, epsilon=0.1):
         super(CrossEntropyLabelSmooth, self).__init__()
         self.epsilon = epsilon
-        self.logsoftmax = nn.LogSoftmax(dim=1).cuda()
+        self.logsoftmax = nn.LogSoftmax(axis=1).cuda()
 
     def forward(self, inputs, targets):
         """
@@ -33,11 +33,11 @@ class CrossEntropyLabelSmooth(nn.Layer):
             inputs: prediction matrix (before softmax) with shape (batch_size, num_classes)
             targets: ground truth labels with shape (num_classes)
         """
-        B, num_classes = inputs.size()
+        B, num_classes = inputs.shape
         log_probs = self.logsoftmax(inputs)
         targets = paddle.zeros_like(log_probs).scatter_(1, targets.unsqueeze(1), 1)
         targets = (1 - self.epsilon) * targets + self.epsilon / num_classes
-        loss = (- targets * log_probs).sum(dim=1).mean()
+        loss = (- targets * log_probs).sum(axis=1).mean()
         return loss
 
 
@@ -58,39 +58,52 @@ def hard_example_mining(dist_mat, labels, return_inds=False):
       thus we can cope with all anchors in parallel.
     """
 
-    assert len(dist_mat.size()) == 2
-    assert dist_mat.size(0) == dist_mat.size(1)
-    N = dist_mat.size(0)
+    assert len(dist_mat.shape) == 2
+    assert dist_mat.shape[0] == dist_mat.shape[1]
+    N = dist_mat.shape[0]
 
     # shape [N, N]
-    is_pos = labels.expand(N, N).eq(labels.expand(N, N).t())
-    is_neg = labels.expand(N, N).ne(labels.expand(N, N).t())
+    is_pos = paddle.expand(labels, [N, N])
+    is_pos = paddle.equal(is_pos, paddle.transpose(paddle.expand(labels, [N, N]), [1,0]))
+    #is_pos = labels.expand(N, N).eq(paddle.transpose(labels.expand(N, N), [1,0]))
+    #is_neg = labels.expand(N, N).ne(paddle.transpose(labels.expand(N, N), [1,0]))
+    is_neg = ~is_pos
 
     # `dist_ap` means distance(anchor, positive)
     # both `dist_ap` and `relative_p_inds` with shape [N, 1]
-    dist_ap, relative_p_inds = paddle.max(
-        dist_mat[is_pos].contiguous().view(N, -1), 1, keepdim=True)
+    # dist_ap, relative_p_inds = paddle.max(
+    #     paddle.reshape(dist_mat[is_pos], [N, -1]), 1, keepdim=True)
+    relative_p_inds = paddle.argmax(paddle.reshape(dist_mat[is_pos], [N, -1]), 1, keepdim=True)
+    dist_ap = paddle.max(paddle.reshape(dist_mat[is_pos], [N, -1]), 1, keepdim=True)
     # `dist_an` means distance(anchor, negative)
     # both `dist_an` and `relative_n_inds` with shape [N, 1]
-    dist_an, relative_n_inds = paddle.min(
-        dist_mat[is_neg].contiguous().view(N, -1), 1, keepdim=True)
+    # dist_an, relative_n_inds = paddle.min(
+    #     paddle.reshape(dist_mat[is_neg], [N, -1]), 1, keepdim=True)
+    relative_n_inds = paddle.argmin(paddle.reshape(dist_mat[is_neg], [N, -1]), 1, keepdim=True)
+    dist_an = paddle.min(paddle.reshape(dist_mat[is_neg], [N, -1]), 1, keepdim=True)
     # shape [N]
     dist_ap = dist_ap.squeeze(1)
     dist_an = dist_an.squeeze(1)
 
     if return_inds:
         # shape [N, N]
-        ind = (labels.new().resize_as_(labels)
-               .copy_(paddle.arange(0, N).long())
-               .unsqueeze(0).expand(N, N))
-        # shape [N, 1]
-        p_inds = paddle.gather(
-            ind[is_pos].contiguous().view(N, -1), 1, relative_p_inds.data)
-        n_inds = paddle.gather(
-            ind[is_neg].contiguous().view(N, -1), 1, relative_n_inds.data)
+        ind = paddle.zeros_like(labels)
+        ind = ind[:] = paddle.arange(0, N)
+        ind = ind.unsqueeze(0).expand([N,N])
+        # ind = (labels.new().resize_as_(labels)
+        #        .copy_(paddle.arange(0, N).long())
+        #        .unsqueeze(0).expand(N, N))
         # shape [N]
-        p_inds = p_inds.squeeze(1)
-        n_inds = n_inds.squeeze(1)
+        # Implement gather() using one_hot()
+        ind_pos = paddle.reshape(ind[is_pos], [N, -1])
+        d = paddle.nn.functional.one_hot(relative_p_inds.squeeze(-1), ind_pos.shape[1])
+        p_inds = paddle.sum(ind_pos*d, axis=1)
+
+        # n_inds = paddle.gather(
+        #     paddle.reshape(ind[is_neg], [N, -1]), relative_n_inds, 1)
+        ind_neg = paddle.reshape(ind[is_neg], [N, -1])
+        d = paddle.nn.functional.one_hot(relative_n_inds.squeeze(-1), ind_neg.shape[1])
+        n_inds = paddle.sum(ind_neg*d, axis=1)
         return dist_ap, dist_an, p_inds, n_inds
 
     return dist_ap, dist_an
@@ -137,17 +150,17 @@ class TriSoftLoss(object):
     def __call__(self, global_feat, labels):
         dist_mat = self.dist_func(global_feat, global_feat)
 
-        N, N = dist_mat.size()
+        N, N = dist_mat.shape
         is_pos = labels.expand(N, N).eq(labels.expand(N, N).t())
         is_neg = labels.expand(N, N).ne(labels.expand(N, N).t())
 
         dist_pos = dist_mat[is_pos].contiguous().view(N, -1)
-        weights_pos = F.softmax(dist_pos, dim=1)
-        dist_pos = (weights_pos * dist_pos).sum(dim=1)
+        weights_pos = F.softmax(dist_pos, axis=1)
+        dist_pos = (weights_pos * dist_pos).sum(axis=1)
 
         dist_neg = dist_mat[is_neg].contiguous().view(N, -1)
-        weights_neg = F.softmax(-dist_neg, dim=1)
-        dist_neg = (weights_neg * dist_neg).sum(dim=1)
+        weights_neg = F.softmax(-dist_neg, axis=1)
+        dist_neg = (weights_neg * dist_neg).sum(axis=1)
 
         y = paddle.ones_like(dist_pos)
         loss = self.ranking_loss(dist_neg, dist_pos, y)
@@ -166,17 +179,17 @@ class TriSoftPlusLoss(object):
         dist_mat = self.dist_func(global_feat, global_feat, attentions, attentions)
         # _, dist_neg, _, n_inds = hard_example_mining(dist_mat, labels, return_inds=True)
 
-        N, N = dist_mat.size()
+        N, N = dist_mat.shape
         is_pos = labels.expand(N, N).eq(labels.expand(N, N).t())
         is_neg = labels.expand(N, N).ne(labels.expand(N, N).t())
 
         dist_pos = dist_mat[is_pos].contiguous().view(N, -1)
-        weights_pos = F.softmax(dist_pos, dim=1)
-        dist_pos = (weights_pos * dist_pos).sum(dim=1)
+        weights_pos = F.softmax(dist_pos, axis=1)
+        dist_pos = (weights_pos * dist_pos).sum(axis=1)
 
         dist_neg = dist_mat[is_neg].contiguous().view(N, -1)
-        weights_neg = F.softmax(-dist_neg, dim=1)
-        dist_neg = (weights_neg * dist_neg).sum(dim=1)
+        weights_neg = F.softmax(-dist_neg, axis=1)
+        dist_neg = (weights_neg * dist_neg).sum(axis=1)
 
         loss = (1. + (dist_pos - dist_neg + self.margin).exp()).log().mean()
 
@@ -195,9 +208,9 @@ class TriHardPlusLoss(object):
         dist_ap, dist_an, p_inds, n_inds = hard_example_mining(dist_mat, labels, return_inds=True)
 
         Xp, Xn = global_feat[p_inds], global_feat[n_inds]
-        Xp2_Xn2 = Xp.pow(2).sum(dim=1) - Xn.pow(2).sum(dim=1)
-        XaXn = (global_feat * Xn).sum(dim=1)
-        XaXp = (global_feat * Xp).sum(dim=1)
+        Xp2_Xn2 = Xp.pow(2).sum(axis=1) - Xn.pow(2).sum(axis=1)
+        XaXn = (global_feat * Xn).sum(axis=1)
+        XaXp = (global_feat * Xp).sum(axis=1)
 
         dist_ap_dist_an = (Xp2_Xn2 + 2. * XaXn - 2. * XaXp) / (dist_ap + dist_an)
 
@@ -225,7 +238,7 @@ class TriHardPlusLossEnhanced(object):
 
     @staticmethod
     def hard_example_mining(dist_mat, labelsA, labelsB):
-        M, N = dist_mat.size()
+        M, N = dist_mat.shape
 
         is_pos = labelsA.expand(N, M).t().eq(labelsB.expand(M, N))
         is_neg = labelsA.expand(N, M).t().ne(labelsB.expand(M, N))
@@ -248,8 +261,8 @@ class MMDLoss(object):
         self.kernel_mul = kernel_mul
 
     def guassian_kernel(self, source, target, fix_sigma=None):
-        n_samples = source.size(0) + target.size(0)
-        concat = paddle.cat([source, target], dim=0)
+        n_samples = source.shape[0] + target.shape[0]
+        concat = paddle.concat([source, target], axis=0)
         l2_distance = euclidean_dist(concat, concat)
 
         bandwidth = fix_sigma if fix_sigma else paddle.sum(l2_distance.data) / (n_samples ** 2 - n_samples)
@@ -259,7 +272,7 @@ class MMDLoss(object):
         return sum(kernel_val)
 
     def __call__(self, source, target, fix_sigma=None):
-        batch_size = source.size(0)
+        batch_size = source.shape[0]
         kernels = self.guassian_kernel(source, target, fix_sigma=fix_sigma)
         XX = kernels[:batch_size, :batch_size]
         YY = kernels[batch_size:, batch_size:]
@@ -285,8 +298,8 @@ class MMDLoss2(object):
             factors = self._get_mmd_factor(sigmas, x.device)
 
         if normalize:
-            x = F.normalize(x, p=2, dim=1)
-            y = F.normalize(y, p=2, dim=1)
+            x = F.normalize(x, p=2, axis=1)
+            y = F.normalize(y, p=2, axis=1)
 
         xx = dist(x, x) ** 2
         yy = dist(y, y) ** 2

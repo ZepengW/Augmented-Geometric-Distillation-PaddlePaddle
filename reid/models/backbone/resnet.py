@@ -78,7 +78,6 @@ class ResNet(nn.Layer):
                                                 model_urls[arch][1])
             # state_dict = paddle.load(osp.expanduser(ckpt))
             state_dict = paddle.load(weight_path)
-            print(state_dict)
             self.base.set_dict(state_dict)
 
         self.bn = nn.BatchNorm1D(self.embedding)
@@ -86,19 +85,19 @@ class ResNet(nn.Layer):
         self.constant_0 = nn.initializer.Constant(0)
         self.constant_1(self.bn.weight)
         self.constant_0(self.bn.bias)
-        self.bn.bias.stop_gradient = True
+        #self.bn.bias.stop_gradient = True
 
         print(self)
 
     def forward(self, x, out=None, *kwargs):
         x1, x2, x3, feature_map = self.base(x)
 
-        B, C, H, W = feature_map.size()
+        B, C, H, W = feature_map.shape
 
         if self.last_pooling == "max":
-            feature = F.adaptive_max_pool2d(feature_map, 1).view(B, -1)
+            feature = paddle.reshape(F.adaptive_max_pool2d(feature_map, 1), (B, -1))
         else:
-            feature = F.adaptive_avg_pool2d(feature_map, 1).view(B, -1)
+            feature = paddle.reshape(F.adaptive_avg_pool2d(feature_map, 1), (B, -1))
 
         embedded_features = self.bn(feature)
 

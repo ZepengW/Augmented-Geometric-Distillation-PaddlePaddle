@@ -38,11 +38,13 @@ class Trainer(object):
     def after_train(self, *args, **kwargs):
         for trainable in self.trainables:
             trainable.eval()
-            trainable.requires_grad_(requires_grad=False)
+            #trainable.requires_grad_(requires_grad=False)
+            trainable.stop_gradient = True
 
         for untrainable in self.untrainables:
             untrainable.eval()
-            untrainable.requires_grad_(requires_grad=False)
+            #untrainable.requires_grad_(requires_grad=False)
+            untrainable.stop_gradient = True
 
     def basic_criterion(self, pooled, preds, pids):
         pid_loss = self.pid_criterion(preds, pids)
