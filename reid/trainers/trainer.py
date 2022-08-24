@@ -8,7 +8,7 @@ class Trainer(object):
     def __init__(self):
         self.timer = Timer()
 
-        self.pid_criterion = paddle.nn.CrossEntropyLoss()
+        self.pid_criterion = paddle.nn.CrossEntropyLoss(soft_label=False)
         self.triplet_criterion = TriHardPlusLoss(0.0)
 
         self.trainables = []
