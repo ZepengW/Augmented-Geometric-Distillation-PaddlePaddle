@@ -54,12 +54,12 @@ def extract_features(model, data_loader, output_feature="embedding", print_freq=
 
 
 def pairwise_distance(query_features, gallery_features, query=None, gallery=None, re_ranking=False, dist_type='cos'):
-    x = paddle.cat([query_features[f].unsqueeze(0) for f, _, _, *_ in query], 0)
-    y = paddle.cat([gallery_features[f].unsqueeze(0) for f, _, _, *_ in gallery], 0)
+    x = paddle.concat([query_features[f].unsqueeze(0) for f, _, _, *_ in query], 0)
+    y = paddle.concat([gallery_features[f].unsqueeze(0) for f, _, _, *_ in gallery], 0)
 
-    m, n = x.size(0), y.size(0)
-    x = x.view(m, -1)
-    y = y.view(n, -1)
+    m, n = x.shape[0], y.shape[0]
+    x = paddle.reshape(x, [m, -1])
+    y = paddle.reshape(y, [n, -1])
 
     if dist_type.lower() == 'euc':
         print("compute euc dist")
@@ -82,16 +82,17 @@ def pairwise_distance(query_features, gallery_features, query=None, gallery=None
 
 def re_ranking_dist(probFea, galFea, k1, k2, lambda_value, local_distmat=None, only_local=False):
     # if feature vector is numpy, you should use 'torch.tensor' transform it to tensor
-    query_num = probFea.size(0)
-    all_num = query_num + galFea.size(0)
+    query_num = probFea.shape[0]
+    all_num = query_num + galFea.shape[0]
     if only_local:
         original_dist = local_distmat
     else:
-        feat = paddle.cat([probFea,galFea])
+        feat = paddle.concat([probFea,galFea])
         print('using GPU to compute original distance')
-        distmat = paddle.pow(feat,2).sum(dim=1, keepdim=True).expand(all_num,all_num) + \
-                      paddle.pow(feat, 2).sum(dim=1, keepdim=True).expand(all_num, all_num).t()
-        distmat.addmm_(1,-2,feat,feat.t())
+        distmat = paddle.pow(feat,2).sum(axis=1, keepdim=True).expand([all_num,all_num]) + \
+                      paddle.pow(feat, 2).sum(axis=1, keepdim=True).expand([all_num, all_num]).t()
+        # distmat.addmm_(1,-2,feat,feat.t())
+        distmat = paddle.addmm(distmat, feat, feat.t(), 1, -2)
         original_dist = distmat.cpu().numpy()
         del feat
         if not local_distmat is None:

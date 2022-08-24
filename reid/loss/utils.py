@@ -5,8 +5,8 @@ import paddle
 
 
 def cos(x, y):
-    x_ = x / x.norm(dim=1, keepdim=True)
-    y_ = y / y.norm(dim=1, keepdim=True)
+    x_ = x / x.norm(axis=1, keepdim=True)
+    y_ = y / y.norm(axis=1, keepdim=True)
     return paddle.mm(x_, y_.t())
 
 
@@ -25,7 +25,7 @@ def euclidean_dist(x, y, *args):
     yy = paddle.transpose(paddle.expand(paddle.pow(y, 2).sum(1, keepdim=True), shape=[n, m]), [1,0])
     dist = xx + yy
     #dist.addmm_(1, -2, x, paddle.transpose(y, [1,0]))
-    dist = paddle.addmm(dist, x, paddle.transpose(y, [1,0]), -2, 1)
+    dist = paddle.addmm(dist, x, paddle.transpose(y, [1,0]), 1, -2)
     
     # dist = dist.clamp(min=1e-12).sqrt()  # for numerical stability
     dist = paddle.sqrt(paddle.clip(dist, min=1e-12))
