@@ -1,0 +1,5 @@
+python main.py -g 1 --dataset msmt17 --logs-dir ./logs/msmt17
+python inversion.py -g 1 --generation-dir ./data/generations_r50_msmt17 --shots 40 --iters 640 --teacher ./logs/msmt17
+python main_incremental.py -g 1 --dataset market --previous ./logs/msmt17 --logs-dir ./logs/msmt17-market_GD --inversion-dir ./data/generations_r50_msmt17 --evaluate 80 --seed 1 --algo-config ./configs/res-triangle.yaml
+python main_incremental.py -g 1 --dataset market --previous ./logs/msmt17 --logs-dir ./logs/msmt17-market_simGD --inversion-dir ./data/generations_r50_msmt17 --evaluate 80 --seed 1 --algo-config ./configs/sim-res-triangle.yaml
+python main_incrementalX.py -g 1 --dataset market --previous ./logs/msmt17 --logs-dir ./logs/msmt17-market_XsimGD --inversion-dir ./data/generations_r50_msmt17 --evaluate 80 --seed 1 --peers 2 --algo-config ./configs/inverXion.yaml
