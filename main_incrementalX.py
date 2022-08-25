@@ -5,18 +5,22 @@
 import argparse
 import os.path as osp
 from copy import deepcopy
+import os
 
-from reid import trainers
-from reid.utils.data.dataset import Dataset, InversionDataset
-from reid.utils.data import build_test_loader, build_train_loader
-from reid.evaluation.evaluators import Evaluator
-from reid.utils.serialization import load_checkpoint, CheckpointManager
-from reid.utils.lr_schedulers import WarmupLRScheduler
-from reid.utils import before_run, build_optimizer
-from reid.models import ResNet, Linear, Networks
 
 
 def main(args):
+    # Set CUDA env
+    os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(args.gpu)
+    from reid import trainers
+    from reid.utils.data.dataset import Dataset, InversionDataset
+    from reid.utils.data import build_test_loader, build_train_loader
+    from reid.evaluation.evaluators import Evaluator
+    from reid.utils.serialization import load_checkpoint, CheckpointManager
+    from reid.utils.lr_schedulers import WarmupLRScheduler
+    from reid.utils import before_run, build_optimizer
+    from reid.models import ResNet, Linear, Networks
+    
     before_run(args)
 
     dataset = Dataset(args.data_root, args.dataset)

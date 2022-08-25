@@ -67,6 +67,7 @@ class Timer(object):
 
 
 def before_run(args):
+    
     # Set log file
     sys.stdout = Logger(osp.join(args.logs_dir, 'log.txt'), args.resume)
 
@@ -92,8 +93,7 @@ def before_run(args):
     zipper = Zipper(root='.', zippath=osp.join(args.logs_dir, 'Red.zip'))
     zipper.zip()
 
-    # Set CUDA env
-    os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(args.gpu)
+    
 
 
 def set_seed(args):
