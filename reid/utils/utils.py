@@ -99,8 +99,7 @@ def before_run(args):
 def set_seed(args):
     random.seed(args.seed)
     np.random.seed(args.seed)
-    paddle.manual_seed(args.seed)
-    paddle.cuda.manual_seed_all(args.seed)
+    paddle.seed(args.seed)
 
 
 def build_optimizer(backbone, classifier, args):

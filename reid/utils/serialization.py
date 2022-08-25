@@ -19,7 +19,7 @@ def load_checkpoint(fpath):
     fpath = osp.join(fpath, 'checkpoint.pth.tar') if osp.isdir(fpath) else fpath
 
     if osp.isfile(fpath):
-        checkpoint = paddle.load(fpath, map_location=paddle.device('cpu'))
+        checkpoint = paddle.load(fpath)
         print("=> Loaded checkpoint '{}'".format(fpath))
         return checkpoint
     else:
