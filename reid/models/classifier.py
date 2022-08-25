@@ -66,7 +66,7 @@ class Linear(nn.Layer):
         normal_m = nn.initializer.Normal(std=0.001)
         normal_m(new_W)
 
-        expanded_W = paddle.cat([new_W.data, self.W.data], dim=0)
+        expanded_W = paddle.concat([new_W, self.W], axis=0)
         self.W = paddle.create_parameter(shape=expanded_W.shape, dtype=(expanded_W.numpy().dtype),\
             default_initializer=nn.initializer.Assign(expanded_W))
         print(f"Expand W from {self.out_features-num_classes} classes to {self.out_features}")

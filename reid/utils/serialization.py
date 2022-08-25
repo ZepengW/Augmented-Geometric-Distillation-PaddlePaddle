@@ -66,8 +66,9 @@ class CheckpointManager(object):
 
     def load(self, ckpt):
         for name, module in self.modules.items():
-            missing_keys, unexpected_keys = module.load_state_dict(ckpt.get(name, {}), strict=False)
-            print(f"Loading {name}... \n"
-                  f"missing keys {missing_keys} \n"
-                  f"unexpected keys {unexpected_keys} \n")
+            # module.load(ckpt.get(name, {}), strict=False)
+            module.set_state_dict(ckpt.get(name, {}))
+            # print(f"Loading {name}... \n"
+            #       f"missing keys {missing_keys} \n"
+            #       f"unexpected keys {unexpected_keys} \n")
         return ckpt["epoch"]

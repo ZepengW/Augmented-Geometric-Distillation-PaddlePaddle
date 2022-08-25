@@ -30,7 +30,7 @@ def main(args):
     # Load from checkpoint
     epoch = 1
     checkpoint = load_checkpoint(args.previous)
-    num_previous_classes = checkpoint['classifier']['W'].size(0)
+    num_previous_classes = checkpoint['classifier']['W'].shape[0]
 
     backbone_prec = ResNet(depth=args.depth, last_stride=args.last_stride, last_pooling=args.last_pooling, embedding=args.embedding)
     classifier_prec = Linear(args.embedding, num_previous_classes)

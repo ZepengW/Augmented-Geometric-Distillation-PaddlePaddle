@@ -80,7 +80,7 @@ class InversionIncrementalTrainer(Trainer):
         Old data + preceding model -> outdated_outputs_prec
         """
 
-        self.optimizer.zero_grad()
+        self.optimizer.clear_grad()
         outdated_outputs_prec = self.networks_prec(inputs_prec).detach()
         outputs, outputs_prec = self.networks(paddle.concat([inputs, inputs_prec], axis=0)).divide(2)
         loss, losses = self._compute_loss(outputs, outputs_prec, outdated_outputs_prec, pids, pids_prec)
@@ -134,7 +134,7 @@ class InverXionIncrementalTrainer(InversionIncrementalTrainer):
         Old data + preceding model -> outdated_outputs_prec
         """
 
-        self.optimizer.zero_grad()
+        self.optimizer.clear_grad()
 
         outdated_outputs_prec_list = [
             self.networks_prec(inputs_prec).detach()
@@ -142,7 +142,8 @@ class InverXionIncrementalTrainer(InversionIncrementalTrainer):
         ]
 
         for i, (inputs, inputs_prec) in enumerate(zip(inputs_list, inputs_prec_list)):
-            outputs, outputs_prec = self.networks(paddle.concat([inputs, inputs_prec], axis=0)).divide(2)
+            o = self.networks(paddle.concat([inputs, inputs_prec], axis=0))
+            outputs, outputs_prec = o.divide(2)
             loss, losses = self._compute_loss(outputs, outputs_prec,
                                               [outdated_outputs_prec_list[i]] + outdated_outputs_prec_list[:i] + outdated_outputs_prec_list[i+1:],
                                               pids,
@@ -173,6 +174,6 @@ class InverXionIncrementalTrainer(InversionIncrementalTrainer):
 
     def _parse_data(self, inputs):
         imgs_list, _, pids, _ = inputs
-        inputs_list = [imgs.to(self.device) for imgs in imgs_list]
-        pids = pids.to(self.device)
+        inputs_list = [imgs for imgs in imgs_list]
+        pids = pids
         return inputs_list, pids

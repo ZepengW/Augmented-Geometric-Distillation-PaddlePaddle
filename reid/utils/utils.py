@@ -25,7 +25,7 @@ class DivisibleDict(dict):
         def recursive_divide(obj, sections):
 
             if isinstance(obj, paddle.Tensor):
-                return obj.split(obj.size(0) // sections)
+                return obj.split(sections)
             elif isinstance(obj, (list, tuple)):
                 sub_rets = [[] for _ in range(sections)]
                 for sub_obj in obj:
