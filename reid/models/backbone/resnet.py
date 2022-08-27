@@ -80,12 +80,14 @@ class ResNet(nn.Layer):
             state_dict = paddle.load(weight_path)
             self.base.set_dict(state_dict)
 
-        self.bn = nn.BatchNorm1D(self.embedding)
-        self.constant_1 = nn.initializer.Constant(1)
-        self.constant_0 = nn.initializer.Constant(0)
-        self.constant_1(self.bn.weight)
-        self.constant_0(self.bn.bias)
-        #self.bn.bias.stop_gradient = True
+        self.bn = nn.BatchNorm1D(self.embedding, momentum=0.1)
+        # do not need to initialize with constant
+        # self.constant_1 = nn.initializer.Constant(1)
+        # self.constant_0 = nn.initializer.Constant(0)
+        # self.constant_1(self.bn.weight)
+        # self.constant_0(self.bn.bias)
+        # self.bn.bias.stop_gradient = True
+        # self.bn.weight.stop_gradient = True
 
         print(self)
 
@@ -163,7 +165,7 @@ class Base(nn.Layer):
         self.groups = groups
         self.base_width = width_per_group
         self.conv1 = nn.Conv2D(3, self.inplanes, kernel_size=7, stride=2, padding=3, bias_attr=False)
-        self.bn1 = norm_layer(self.inplanes)
+        self.bn1 = norm_layer(self.inplanes, momentum=0.1)
         self.relu = nn.ReLU()
         self.maxpool = nn.MaxPool2D(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(block, 64, layers[0])
@@ -195,7 +197,7 @@ class Base(nn.Layer):
         if stride != 1 or self.inplanes != planes * block.expansion:
             downsample = nn.Sequential(
                 conv1x1(self.inplanes, planes * block.expansion, stride),
-                norm_layer(planes * block.expansion),
+                norm_layer(planes * block.expansion, momentum=0.1),
             )
 
         layers = []
@@ -241,15 +243,15 @@ class Bottleneck(nn.Layer):
                  base_width=64, dilation=1, norm_layer=None):
         super(Bottleneck, self).__init__()
         if norm_layer is None:
-            norm_layer = nn.BatchNormD
+            norm_layer = nn.BatchNorm2D
         width = int(planes * (base_width / 64.)) * groups
         # Both self.conv2 and self.downsample layers downsample the input when stride != 1
         self.conv1 = conv1x1(inplanes, width)
-        self.bn1 = norm_layer(width)
+        self.bn1 = norm_layer(width, momentum=0.1)
         self.conv2 = conv3x3(width, width, stride, groups, dilation)
-        self.bn2 = norm_layer(width)
+        self.bn2 = norm_layer(width, momentum=0.1)
         self.conv3 = conv1x1(width, planes * self.expansion)
-        self.bn3 = norm_layer(planes * self.expansion)
+        self.bn3 = norm_layer(planes * self.expansion, momentum=0.1)
         self.relu = nn.ReLU()
         self.downsample = downsample
         self.stride = stride
@@ -284,17 +286,17 @@ class BasicBlock(nn.Layer):
                  base_width=64, dilation=1, norm_layer=None):
         super(BasicBlock, self).__init__()
         if norm_layer is None:
-            norm_layer = nn.BatchNormD
+            norm_layer = nn.BatchNorm2D
         if groups != 1 or base_width != 64:
             raise ValueError('BasicBlock only supports groups=1 and base_width=64')
         if dilation > 1:
             raise NotImplementedError("Dilation > 1 not supported in BasicBlock")
         # Both self.conv1 and self.downsample layers downsample the input when stride != 1
         self.conv1 = conv3x3(inplanes, planes, stride)
-        self.bn1 = norm_layer(planes)
+        self.bn1 = norm_layer(planes, momentum=0.1)
         self.relu = nn.ReLU()
         self.conv2 = conv3x3(planes, planes)
-        self.bn2 = norm_layer(planes)
+        self.bn2 = norm_layer(planes, momentum=0.1)
         self.downsample = downsample
         self.stride = stride
 
