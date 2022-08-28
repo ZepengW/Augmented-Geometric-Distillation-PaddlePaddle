@@ -16,38 +16,38 @@ from reid.loss import TriHardPlusLoss as TriHardPlusLoss_paddle
 
 
 def gen_comdata():
-    # init loss
-    criterion_paddle = paddle.nn.CrossEntropyLoss()
-    criterion_torch = torch.nn.CrossEntropyLoss()
-
-
+    
+    paddle.set_device("cpu")
+    device = torch.device("cpu")
+    print(paddle.get_device())
     # prepare logger & load data
     reprod_logger = ReprodLogger()
     fake_global = np.load("./data/test_diff/fake_global.npy")
     fake_preds = np.load("./data/test_diff/fake_preds.npy")
     fake_label = np.load("./data/test_diff/fake_label.npy")
 
+    # save the torch output
+    pid_criterion_torch = torch.nn.CrossEntropyLoss()
+    pid_loss_troch = pid_criterion_torch(torch.tensor(fake_preds, dtype=torch.float32, device=device),
+                                                torch.tensor(fake_label, dtype=torch.int64, device=device))
+    triplet_criterion_torch = TriHardPlusLoss(0.0)
+    triplet_loss_torch, *_ = triplet_criterion_torch(torch.tensor(fake_global, dtype=torch.float32, device=device),
+                                                torch.tensor(fake_label, dtype=torch.int64, device=device))
+    loss_torch = pid_loss_troch + triplet_loss_torch
+    reprod_logger.add("loss", loss_torch.detach().numpy())
+    reprod_logger.save("./data/test_result/loss_ref.npy")
+
     # save the paddle output
     pid_criterion_paddle = paddle.nn.CrossEntropyLoss()
     pid_loss_paddle = pid_criterion_paddle(paddle.to_tensor(fake_preds, dtype="float32"), 
                                             paddle.to_tensor(fake_label, dtype="int64"))
     triplet_criterion_paddle = TriHardPlusLoss_paddle(0.0)
-    triplet_loss_paddle = triplet_criterion_paddle(paddle.to_tensor(fake_global, dtype="float32"), 
+    triplet_loss_paddle , *_= triplet_criterion_paddle(paddle.to_tensor(fake_global, dtype="float32"), 
                                             paddle.to_tensor(fake_label, dtype="int64"))
     loss_paddle = pid_loss_paddle + triplet_loss_paddle
-    reprod_logger.add("loss", loss_paddle.cpu().detach().numpy())
+    print(loss_paddle.dtype)
+    reprod_logger.add("loss", loss_paddle.detach().numpy())
     reprod_logger.save("./data/test_result/loss_paddle.npy")
-
-    # save the torch output
-    pid_criterion_torch = torch.nn.CrossEntropyLoss()
-    pid_loss_troch = pid_criterion_torch(torch.tensor(fake_preds, dtype=torch.float32),
-                                                torch.tensor(fake_label, dtype=torch.int64))
-    triplet_criterion_torch = TriHardPlusLoss(0.0)
-    triplet_loss_torch = triplet_criterion_torch(torch.tensor(fake_global, dtype=torch.float32),
-                                                torch.tensor(fake_label, dtype=torch.int64))
-    loss_torch = pid_loss_troch + triplet_loss_torch
-    reprod_logger.add("loss", loss_torch.cpu().detach().numpy())
-    reprod_logger.save("./data/test_result/loss_ref.npy")
 
 def test_loss():
     # load data
@@ -57,8 +57,8 @@ def test_loss():
 
     # compare result and produce log
     diff_helper.compare_info(torch_info, paddle_info)
-    diff_helper.report(path="./data/test_result/loss_log/loss.log")
+    diff_helper.report(path="./data/test_result/loss_log/sumloss.log", diff_threshold=1e-5)
 
 if __name__ == "__main__":
     gen_comdata()
-    #test_loss()
+    test_loss()

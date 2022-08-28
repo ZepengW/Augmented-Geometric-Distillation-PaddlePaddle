@@ -46,7 +46,7 @@ def gen_comdata():
     networks_paddle = Networks_paddle(backbone_paddle, classifier_paddle)
 
     # load data
-    inputs = np.load("./data/test_diff/fake_layer0_output2.npy")
+    inputs = np.load("./data/test_diff/fake_data3.npy")
 
     reprod_logger = ReprodLogger()
     # save the torch output
@@ -54,13 +54,13 @@ def gen_comdata():
         torch.tensor(
             inputs, dtype=torch.float32).to(torch_device))
     print(torch_out['maps'][0].cpu().detach().numpy().shape)
-    reprod_logger.add("layer1single", torch_out['maps'][0].cpu().detach().numpy())
+    reprod_logger.add("all_net", torch_out['preds'].cpu().detach().numpy())
     reprod_logger.save("./data/test_result/forward_ref.npy")
 
     # save the paddle output
-    paddle_out = backbone_paddle(paddle.to_tensor(inputs, dtype="float32"))
+    paddle_out = networks_paddle(paddle.to_tensor(inputs, dtype="float32"))
     print(paddle_out['maps'][0].cpu().detach().numpy().shape)
-    reprod_logger.add("layer1single", paddle_out['maps'][0].cpu().detach().numpy())
+    reprod_logger.add("all_net", paddle_out['preds'].cpu().detach().numpy())
     reprod_logger.save("./data/test_result/forward_paddle.npy")
     """for i in range(128):
         for j in range(2048):
@@ -77,7 +77,7 @@ def test_forward():
     # compare result and produce log
     diff_helper.compare_info(torch_info, paddle_info)
     diff_helper.report(
-        path="./data/test_result/log/forward_diff_layer1single.log", diff_threshold=1e-5)
+        path="./data/test_result/log/all_net.log", diff_threshold=1e-5)
 
 if __name__ == "__main__":
     gen_comdata()
